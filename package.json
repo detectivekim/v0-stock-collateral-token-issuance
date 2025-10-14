@@ -1,0 +1,38 @@
+{
+  "dependencies": {
+    "@abstract-foundation/agw-client": "latest",
+    "@privy-io/react-auth": "latest",
+    "@solana-program/memo": "latest",
+    "@solana-program/system": "latest",
+    "@solana-program/token": "latest",
+    "@solana/kit": "latest",
+    "@vercel/analytics": "1.5.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "geist": "latest",
+    "immer": "latest",
+    "lucide-react": "^0.454.0",
+    "msw": "^2.6.8",
+    "next": "15.2.4",
+    "permissionless": "latest",
+    "qrcode.react": "^4.1.0",
+    "react": "^19",
+    "react-dom": "^19",
+    "recharts": "latest",
+    "swr": "latest",
+    "tailwind-merge": "^2.5.5",
+    "tailwindcss-animate": "^1.0.7",
+    "tw-animate-css": "latest",
+    "use-sync-external-store": "latest",
+    "zustand": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/qrcode.react": "^1.0.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "postcss": "^8.5",
+    "tailwindcss": "^4.1.9",
+    "typescript": "^5"
+  }
+}
