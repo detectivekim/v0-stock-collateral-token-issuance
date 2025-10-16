@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { LayoutDashboard, Wallet, Send, Download, ShoppingCart, LogOut, Languages } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -21,9 +21,15 @@ export function NavBar() {
   const { logout, user } = usePrivy()
   const { t, language, setLanguage } = useTranslation()
   const pathname = usePathname()
+  const router = useRouter()
 
   const toggleLanguage = () => {
     setLanguage(language === "en" ? "ko" : "en")
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    router.push("/")
   }
 
   const getUserInitials = () => {
@@ -88,7 +94,7 @@ export function NavBar() {
                 {getUserInitials()}
               </AvatarFallback>
             </Avatar>
-            <Button variant="ghost" size="sm" onClick={logout} className="gap-2">
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
               <LogOut className="h-4 w-4" />
               <span className="hidden md:inline">{t("nav.logout")}</span>
             </Button>
