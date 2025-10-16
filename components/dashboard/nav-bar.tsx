@@ -1,21 +1,20 @@
 "use client"
 
-import { usePrivy } from "@/lib/mock-auth-provider"
+import { usePrivy } from "@privy-io/react-auth"
 import { useTranslation } from "@/lib/i18n-provider"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { LayoutDashboard, Wallet, Send, Download, ShoppingCart, TrendingUp, LogOut, Languages } from "lucide-react"
+import { LayoutDashboard, Wallet, Send, Download, ShoppingCart, LogOut, Languages } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 const navItems = [
   { href: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
-  { href: "/portfolio", labelKey: "nav.portfolio", icon: Wallet },
+  { href: "/loan", labelKey: "nav.portfolio", icon: Wallet },
   { href: "/send", labelKey: "nav.send", icon: Send },
   { href: "/receive", labelKey: "nav.receive", icon: Download },
   { href: "/buy", labelKey: "nav.buy", icon: ShoppingCart },
-  { href: "/sell", labelKey: "nav.sell", icon: TrendingUp },
 ]
 
 export function NavBar() {
@@ -28,10 +27,22 @@ export function NavBar() {
   }
 
   const getUserInitials = () => {
-    if (!user?.email) return "U"
-    const email = user.email
-    const name = email.split("@")[0]
-    return name.slice(0, 2).toUpperCase()
+    if (!user) return "U"
+
+    // Try to get email from various sources
+    const email = user.email?.address || user.google?.email || user.twitter?.username
+
+    if (email && typeof email === "string") {
+      const name = email.split("@")[0]
+      return name.slice(0, 2).toUpperCase()
+    }
+
+    // If no email, try wallet address
+    if (user.wallet?.address) {
+      return user.wallet.address.slice(2, 4).toUpperCase()
+    }
+
+    return "U"
   }
 
   return (

@@ -1,6 +1,6 @@
 "use client"
 
-import { usePrivy } from "@/lib/mock-auth-provider"
+import { usePrivy } from "@privy-io/react-auth"
 import { useTranslation } from "@/lib/i18n-provider"
 import { NavBar } from "@/components/dashboard/nav-bar"
 import { Card } from "@/components/ui/card"
@@ -145,7 +145,7 @@ export default function TradePage() {
           ) : (
             <Card className="p-4 mb-4">
               <div className="space-y-2">
-                <div className="text-sm font-medium mb-3">Select Token</div>
+                <div className="text-sm font-medium mb-3">{t("trade.selectToken")}</div>
                 {tokens
                   ?.filter((t) => t.symbol !== "KRW1")
                   .map((token) => (
@@ -202,13 +202,13 @@ export default function TradePage() {
           <Card className="p-6 mb-4">
             <div className="space-y-4">
               <div>
-                <label className="text-sm text-muted-foreground mb-2 block">Amount</label>
+                <label className="text-sm text-muted-foreground mb-2 block">{t("trade.amount")}</label>
                 <div className="relative">
                   <Input
                     type="text"
                     value={amount}
                     onChange={(e) => handleAmountChange(e.target.value)}
-                    placeholder="0"
+                    placeholder={t("trade.enterAmount")}
                     className="text-4xl font-bold h-auto py-4 border-0 focus-visible:ring-0 bg-transparent"
                   />
                 </div>
@@ -217,11 +217,13 @@ export default function TradePage() {
               <div className="flex items-center justify-between text-sm">
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">KRW1 Balance:</span>
+                    <span className="text-muted-foreground">{t("trade.krw1Balance")}:</span>
                     <span className="ml-2 font-medium">₩{paymentToken?.balance.toLocaleString() || "0"}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">{selectedToken?.symbol} Balance:</span>
+                    <span className="text-muted-foreground">
+                      {selectedToken?.symbol} {t("trade.balance")}:
+                    </span>
                     <span className="ml-2 font-medium">{selectedToken?.balance.toFixed(6) || "0"}</span>
                   </div>
                 </div>
@@ -230,13 +232,13 @@ export default function TradePage() {
               {selectedToken && amount && (
                 <div className="pt-4 border-t space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Buy: You'll get</span>
+                    <span className="text-muted-foreground">{t("trade.buyYouGet")}</span>
                     <span className="font-semibold text-accent">
                       {estimatedBuyQuantity} {selectedToken.symbol}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Sell: You'll get</span>
+                    <span className="text-muted-foreground">{t("trade.sellYouGet")}</span>
                     <span className="font-semibold text-destructive">
                       ₩{Number(estimatedSellAmount).toLocaleString()}
                     </span>
@@ -249,8 +251,8 @@ export default function TradePage() {
           {(hasInsufficientBalanceForBuy || hasInsufficientBalanceForSell) && (
             <Alert variant="destructive" className="mb-4">
               <AlertDescription>
-                {hasInsufficientBalanceForBuy && "Insufficient KRW1 balance for buying"}
-                {hasInsufficientBalanceForSell && "Insufficient token balance for selling"}
+                {hasInsufficientBalanceForBuy && t("trade.insufficientKRW1")}
+                {hasInsufficientBalanceForSell && t("trade.insufficientToken")}
               </AlertDescription>
             </Alert>
           )}
@@ -258,7 +260,9 @@ export default function TradePage() {
           {tradeSuccess && (
             <Alert className="mb-4 border-accent">
               <CheckCircle2 className="h-4 w-4 text-accent" />
-              <AlertDescription>{tradeSuccess === "buy" ? "Purchase completed!" : "Sale completed!"}</AlertDescription>
+              <AlertDescription>
+                {tradeSuccess === "buy" ? t("trade.buySuccess") : t("trade.sellSuccess")}
+              </AlertDescription>
             </Alert>
           )}
 
@@ -269,7 +273,7 @@ export default function TradePage() {
               className="h-14 text-lg font-semibold bg-accent hover:bg-accent/90"
               size="lg"
             >
-              {isProcessing ? "Processing..." : `Buy ${selectedToken?.symbol || ""}`}
+              {isProcessing ? t("trade.processing") : `${t("trade.buy")} ${selectedToken?.symbol || ""}`}
             </Button>
 
             <Button
@@ -278,14 +282,14 @@ export default function TradePage() {
               className="h-14 text-lg font-semibold bg-destructive hover:bg-destructive/90 text-destructive-foreground"
               size="lg"
             >
-              {isProcessing ? "Processing..." : `Sell ${selectedToken?.symbol || ""}`}
+              {isProcessing ? t("trade.processing") : `${t("trade.sell")} ${selectedToken?.symbol || ""}`}
             </Button>
           </div>
 
           <div className="mt-6 p-4 rounded-lg bg-muted/30">
             <div className="text-sm text-muted-foreground space-y-2">
               <div className="flex items-center justify-between">
-                <span>Fee</span>
+                <span>{t("trade.fee")}</span>
                 <span>0.3%</span>
               </div>
             </div>

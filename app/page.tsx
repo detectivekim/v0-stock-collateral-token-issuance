@@ -1,6 +1,6 @@
 "use client"
 
-import { usePrivy } from "@/lib/mock-auth-provider"
+import { usePrivy } from "@privy-io/react-auth"
 import { useTranslation } from "@/lib/i18n-provider"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Languages } from "lucide-react"

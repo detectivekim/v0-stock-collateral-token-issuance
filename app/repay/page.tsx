@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuth } from "@/lib/mock-auth-provider"
+import { usePrivy } from "@privy-io/react-auth"
 import { NavBar } from "@/components/dashboard/nav-bar"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -16,7 +16,7 @@ import Link from "next/link"
 type Step = "select" | "method" | "amount" | "success"
 
 export default function RepayPage() {
-  const { authenticated } = useAuth()
+  const { authenticated } = usePrivy()
   const router = useRouter()
   const [step, setStep] = useState<Step>("select")
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null)
@@ -138,7 +138,7 @@ export default function RepayPage() {
                     대시보드로
                   </Button>
                 </Link>
-                <Link href="/portfolio">
+                <Link href="/loan">
                   <Button className="w-full">포트폴리오 보기</Button>
                 </Link>
               </div>

@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card"
 import useSWR from "swr"
 import type { Transaction } from "@/lib/types"
 import { ArrowUpRight, ArrowDownLeft, RefreshCw, Plus } from "lucide-react"
+import { useTranslation } from "@/lib/i18n-provider"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -16,25 +17,21 @@ const transactionIcons = {
   receive: ArrowDownLeft,
 }
 
-const transactionLabels = {
-  borrow: "대출",
-  repay: "상환",
-  collateral_add: "담보 추가",
-  swap: "스왑",
-  send: "전송",
-  receive: "수신",
-}
-
 export function RecentTransactions() {
+  const { t } = useTranslation()
   const { data: transactions } = useSWR<Transaction[]>("/api/transactions", fetcher)
+
+  const getTransactionLabel = (type: Transaction["type"]) => {
+    return t(`dashboard.txType.${type}`)
+  }
 
   return (
     <Card className="p-6">
-      <h3 className="text-lg font-semibold mb-4">최근 거래</h3>
+      <h3 className="text-lg font-semibold mb-4">{t("dashboard.recentTransactions")}</h3>
       <div className="space-y-3">
         {transactions?.map((tx) => {
           const Icon = transactionIcons[tx.type]
-          const label = transactionLabels[tx.type]
+          const label = getTransactionLabel(tx.type)
 
           return (
             <div

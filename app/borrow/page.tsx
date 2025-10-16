@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuth } from "@/lib/mock-auth-provider"
+import { usePrivy } from "@privy-io/react-auth"
 import { NavBar } from "@/components/dashboard/nav-bar"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -15,7 +15,7 @@ import Link from "next/link"
 type Step = "consent" | "selection" | "configuration" | "success"
 
 export default function BorrowPage() {
-  const { authenticated } = useAuth()
+  const { authenticated } = usePrivy()
   const router = useRouter()
   const [step, setStep] = useState<Step>("consent")
   const [selectedCollateral, setSelectedCollateral] = useState<

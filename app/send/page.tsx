@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuth } from "@/lib/mock-auth-provider"
+import { usePrivy } from "@privy-io/react-auth"
 import { NavBar } from "@/components/dashboard/nav-bar"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,12 +12,14 @@ import type { Token } from "@/lib/types"
 import { TokenSelector } from "@/components/swap/token-selector"
 import { Send, AlertCircle, CheckCircle2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useTranslation } from "@/lib/i18n-provider"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export default function SendPage() {
-  const { authenticated, user } = useAuth()
+  const { authenticated, user } = usePrivy()
   const router = useRouter()
+  const { t } = useTranslation()
   const { data: tokens } = useSWR<Token[]>("/api/tokens", fetcher)
 
   const [selectedToken, setSelectedToken] = useState<Token | null>(null)
@@ -87,24 +89,24 @@ export default function SendPage() {
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-xl mx-auto">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2">전송</h1>
-            <p className="text-muted-foreground">토큰을 다른 지갑으로 전송하세요</p>
+            <h1 className="text-3xl font-bold mb-2">{t("send.title")}</h1>
+            <p className="text-muted-foreground">{t("send.subtitle")}</p>
           </div>
 
           <Card className="p-6">
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-sm font-medium">토큰 선택</label>
+                <label className="text-sm font-medium">{t("send.selectToken")}</label>
                 <TokenSelector
                   tokens={tokens || []}
                   selectedToken={selectedToken}
                   onSelect={setSelectedToken}
-                  label="토큰 선택"
+                  label={t("send.selectToken")}
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">전송 금액</label>
+                <label className="text-sm font-medium">{t("send.sendAmount")}</label>
                 <Card className="p-4 bg-muted/30">
                   <Input
                     type="text"
@@ -115,14 +117,16 @@ export default function SendPage() {
                   />
                   {selectedToken && (
                     <div className="flex items-center justify-between text-sm mt-2">
-                      <span className="text-muted-foreground">잔액: {selectedToken.balance.toLocaleString()}</span>
+                      <span className="text-muted-foreground">
+                        {t("send.balance").replace("{balance}", selectedToken.balance.toLocaleString())}
+                      </span>
                       <Button
                         variant="link"
                         size="sm"
                         className="h-auto p-0 text-accent"
                         onClick={() => setAmount(selectedToken.balance.toString())}
                       >
-                        최대
+                        {t("send.max")}
                       </Button>
                     </div>
                   )}
@@ -130,7 +134,7 @@ export default function SendPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">받는 주소</label>
+                <label className="text-sm font-medium">{t("send.recipientAddress")}</label>
                 <Input
                   type="text"
                   value={recipientAddress}
@@ -138,24 +142,24 @@ export default function SendPage() {
                   placeholder="0x..."
                   className="font-mono"
                 />
-                <p className="text-xs text-muted-foreground">받는 사람의 지갑 주소를 입력하세요</p>
+                <p className="text-xs text-muted-foreground">{t("send.addressPlaceholder")}</p>
               </div>
 
               {selectedToken && amount && recipientAddress && (
                 <Card className="p-4 bg-muted/30">
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">전송 금액</span>
+                      <span className="text-muted-foreground">{t("send.sendAmount")}</span>
                       <span className="font-medium">
                         {amount} {selectedToken.symbol}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">예상 수수료</span>
+                      <span className="text-muted-foreground">{t("send.estimatedFee")}</span>
                       <span className="font-medium">₩{(Number.parseFloat(amount) * 0.001).toLocaleString()}</span>
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t border-border">
-                      <span className="text-muted-foreground">총 금액</span>
+                      <span className="text-muted-foreground">{t("send.totalAmount")}</span>
                       <span className="font-semibold">
                         {(Number.parseFloat(amount) * 1.001).toFixed(6)} {selectedToken.symbol}
                       </span>
@@ -167,34 +171,34 @@ export default function SendPage() {
               {hasInsufficientBalance && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>잔액이 부족합니다</AlertDescription>
+                  <AlertDescription>{t("send.insufficientBalance")}</AlertDescription>
                 </Alert>
               )}
 
               {recipientAddress && !isValidAddress && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>올바른 주소를 입력하세요</AlertDescription>
+                  <AlertDescription>{t("send.invalidAddress")}</AlertDescription>
                 </Alert>
               )}
 
               {sendSuccess && (
                 <Alert>
                   <CheckCircle2 className="h-4 w-4" />
-                  <AlertDescription>전송이 완료되었습니다!</AlertDescription>
+                  <AlertDescription>{t("send.sendCompleted")}</AlertDescription>
                 </Alert>
               )}
 
               <Button onClick={handleSend} disabled={!canSend || isSending} className="w-full" size="lg">
                 <Send className="h-4 w-4 mr-2" />
-                {isSending ? "전송 중..." : "전송"}
+                {isSending ? t("send.sending") : t("send.sendButton")}
               </Button>
             </div>
           </Card>
 
           <Alert className="mt-6">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>전송한 토큰은 되돌릴 수 없습니다. 받는 주소를 다시 한번 확인하세요.</AlertDescription>
+            <AlertDescription>{t("send.warning")}</AlertDescription>
           </Alert>
         </div>
       </main>

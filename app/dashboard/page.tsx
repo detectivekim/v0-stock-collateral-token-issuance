@@ -1,6 +1,6 @@
 "use client"
 
-import { usePrivy } from "@/lib/mock-auth-provider"
+import { usePrivy } from "@privy-io/react-auth"
 import { useTranslation } from "@/lib/i18n-provider"
 import { NavBar } from "@/components/dashboard/nav-bar"
 import { AssetsList } from "@/components/dashboard/assets-list"

@@ -1,9 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { GeistSans } from "geist/font/sans"
-import { GeistMono } from "geist/font/mono"
 import "./globals.css"
-import { MockAuthProvider } from "@/lib/mock-auth-provider"
+import { AuthProvider } from "@/lib/privy-provider"
 import { I18nProvider } from "@/lib/i18n-provider"
 import { Suspense } from "react"
 
@@ -35,10 +33,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased`}>
+      <body className="font-sans antialiased">
         <Suspense fallback={<div>Loading...</div>}>
           <I18nProvider>
-            <MockAuthProvider>{children}</MockAuthProvider>
+            <AuthProvider>{children}</AuthProvider>
           </I18nProvider>
         </Suspense>
       </body>
