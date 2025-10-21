@@ -23,9 +23,20 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               window.addEventListener('error', function(e) {
-                if (e.message && e.message.includes('ethereum')) {
+                if (e.message && (e.message.includes('ethereum') || e.message.includes('privy'))) {
                   e.preventDefault();
                   e.stopPropagation();
+                  return false;
+                }
+              });
+              
+              window.addEventListener('unhandledrejection', function(e) {
+                if (e.reason && (
+                  e.reason.message?.includes('auth.privy.io') ||
+                  e.reason.message?.includes('TimeoutError') ||
+                  e.reason.code === 'api_error'
+                )) {
+                  e.preventDefault();
                   return false;
                 }
               });

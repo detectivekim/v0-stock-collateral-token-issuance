@@ -6,21 +6,26 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import useSWR from "swr"
-import type { Token, StockAccount, Loan, Portfolio } from "@/lib/types"
+import { useAppState } from "@/store/app-state"
 import { useTranslation } from "@/lib/i18n-provider"
-import { TrendingUp, Plus, ArrowRight } from "lucide-react"
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+import { TrendingUp, Plus, ArrowRight, AlertTriangle, Info } from "lucide-react"
 
 export default function LoanPage() {
   const { authenticated, ready } = usePrivy()
   const router = useRouter()
-  const { data: tokens } = useSWR<Token[]>("/api/tokens", fetcher)
-  const { data: stockAccounts } = useSWR<StockAccount[]>("/api/stock-accounts", fetcher)
-  const { data: loans } = useSWR<Loan[]>("/api/loans", fetcher)
-  const { data: portfolio } = useSWR<Portfolio>("/api/portfolio", fetcher)
   const { t } = useTranslation()
+
+  const {
+    tokens,
+    stockAccounts,
+    loans,
+    collateral,
+    getTotalCollateralValue,
+    getTotalBorrowedValue,
+    getHealthFactor,
+    getCurrentInterestRate,
+    refreshPrices,
+  } = useAppState()
 
   useEffect(() => {
     if (ready && !authenticated) {
@@ -28,22 +33,38 @@ export default function LoanPage() {
     }
   }, [authenticated, ready, router])
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshPrices()
+    }, 30000) // Every 30 seconds
+
+    return () => clearInterval(interval)
+  }, [refreshPrices])
+
   if (!ready || !authenticated) {
     return null
   }
 
-  const cryptoCollateral = tokens?.reduce((sum, token) => sum + token.value, 0) || 0
-  const stockCollateral = stockAccounts?.reduce((sum, account) => sum + account.totalValue, 0) || 0
-  const totalCollateral = cryptoCollateral + stockCollateral
+  const totalCollateral = getTotalCollateralValue()
+  const totalBorrowed = getTotalBorrowedValue()
+  const healthFactor = getHealthFactor()
+  const currentInterestRate = getCurrentInterestRate()
+  const liquidationThreshold = 0.9 // 90%
+  const ltv = totalCollateral > 0 ? totalBorrowed / totalCollateral : 0
 
-  const calculateAccruedInterest = (loan: Loan) => {
+  const cryptoCollateralValue = collateral.filter((c) => c.type === "crypto").reduce((sum, c) => sum + c.value, 0)
+
+  const stockCollateralValue = collateral.filter((c) => c.type === "stock").reduce((sum, c) => sum + c.value, 0)
+
+  const activeLoans = loans.filter((l) => l.status === "active")
+
+  const calculateAccruedInterest = (loan: (typeof loans)[0]) => {
     const startDate = new Date(loan.startDate)
     const daysSinceStart = Math.floor((Date.now() - startDate.getTime()) / (1000 * 60 * 60 * 24))
     return (loan.loanAmount * loan.interestRate * daysSinceStart) / 365 / 100
   }
 
-  const totalAccruedInterest = loans?.reduce((sum, loan) => sum + calculateAccruedInterest(loan), 0) || 0
-  const dailyInterest = loans?.reduce((sum, loan) => sum + (loan.loanAmount * loan.interestRate) / 365 / 100, 0) || 0
+  const totalAccruedInterest = activeLoans.reduce((sum, loan) => sum + calculateAccruedInterest(loan), 0)
 
   return (
     <div className="min-h-screen bg-background">
@@ -55,7 +76,22 @@ export default function LoanPage() {
           <p className="text-muted-foreground">{t("loan.subtitle")}</p>
         </div>
 
-        {/* Active Loans section moved to the top */}
+        {ltv > 0.8 && (
+          <Card className="p-4 bg-orange-500/10 border-orange-500">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-orange-500 mt-0.5" />
+              <div>
+                <div className="font-semibold text-orange-500">청산 위험 경고</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  담보 비율이 90%에 도달하면 청산이 시작됩니다. 암호화폐가 먼저 청산되며, 암호화폐가 부족할 경우 주식 장
+                  시작 전에 담보를 추가하거나 대출을 상환해야 합니다.
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Active Loans section */}
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-semibold">{t("loan.activeLoans")}</h2>
@@ -65,16 +101,13 @@ export default function LoanPage() {
             </Button>
           </div>
 
-          {loans && loans.length > 0 ? (
+          {activeLoans.length > 0 ? (
             <div className="space-y-4">
-              {loans.map((loan) => {
+              {activeLoans.map((loan) => {
                 const accruedInterest = calculateAccruedInterest(loan)
                 const totalRepayment = loan.loanAmount + accruedInterest
-
-                const loanCollateralAccounts = stockAccounts?.filter((account) =>
-                  loan.collateralAccounts?.includes(account.id),
-                )
-                const loanCollateralTokens = tokens?.filter((token) => loan.collateralTokens?.includes(token.symbol))
+                const loanLTV = loan.loanAmount / loan.collateralValue
+                const liquidationPrice = loan.loanAmount / liquidationThreshold
 
                 return (
                   <Card key={loan.id} className="p-6">
@@ -87,54 +120,89 @@ export default function LoanPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm text-muted-foreground">{t("loan.healthFactor")}</div>
-                        <div className="text-xl font-semibold text-accent">{portfolio?.healthFactor.toFixed(2)}</div>
+                        <div className="text-sm text-muted-foreground flex items-center gap-1">
+                          {t("loan.healthFactor")}
+                          <div className="group relative">
+                            <Info className="h-3 w-3 cursor-help" />
+                            <div className="absolute right-0 top-6 w-64 p-3 bg-popover border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                              <div className="text-xs text-left">
+                                <div className="font-semibold mb-1">청산 기준</div>
+                                <div className="text-muted-foreground">
+                                  • LTV 70%까지 대출 가능
+                                  <br />• LTV 90% 도달 시 청산 시작
+                                  <br />• 암호화폐 우선 청산
+                                  <br />• 주식은 장 시작 전 경고
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div
+                          className={`text-xl font-semibold ${healthFactor < 1.2 ? "text-red-500" : healthFactor < 1.5 ? "text-orange-500" : "text-accent"}`}
+                        >
+                          {healthFactor.toFixed(2)}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">LTV: {(loanLTV * 100).toFixed(1)}%</div>
                       </div>
                     </div>
 
-                    {(loanCollateralAccounts && loanCollateralAccounts.length > 0) ||
-                    (loanCollateralTokens && loanCollateralTokens.length > 0) ? (
-                      <div className="mb-4 p-3 bg-muted/50 rounded-lg">
-                        <div className="text-sm font-medium mb-2">{t("loan.collateralAssets")}</div>
-                        <div className="space-y-1">
-                          {loanCollateralAccounts?.map((account) => (
-                            <div key={account.id} className="text-sm flex items-center justify-between">
+                    <div className="mb-4 p-3 bg-muted/50 rounded-lg">
+                      <div className="text-sm font-medium mb-2">{t("loan.collateralAssets")}</div>
+                      <div className="space-y-1">
+                        {loan.collateralAccounts?.map((accountId) => {
+                          const account = stockAccounts.find((a) => a.id === accountId)
+                          if (!account) return null
+                          return (
+                            <div key={accountId} className="text-sm flex items-center justify-between">
                               <span className="text-muted-foreground">
                                 {account.brokerage} ({account.accountNumber})
                               </span>
                               <span className="font-medium">₩{account.totalValue.toLocaleString()}</span>
                             </div>
-                          ))}
-                          {loanCollateralTokens?.map((token) => (
-                            <div key={token.symbol} className="text-sm flex items-center justify-between">
+                          )
+                        })}
+                        {loan.collateralTokens?.map((symbol) => {
+                          const token = tokens.find((t) => t.symbol === symbol)
+                          const collateralItem = collateral.find((c) => c.id === symbol)
+                          if (!token || !collateralItem) return null
+                          return (
+                            <div key={symbol} className="text-sm flex items-center justify-between">
                               <span className="text-muted-foreground">
-                                {token.name} ({token.balance} {token.symbol})
+                                {token.name} ({collateralItem.amount} {symbol})
                               </span>
-                              <span className="font-medium">₩{token.value.toLocaleString()}</span>
+                              <span className="font-medium">₩{collateralItem.value.toLocaleString()}</span>
                             </div>
-                          ))}
-                        </div>
+                          )
+                        })}
                       </div>
-                    ) : null}
+                    </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                       <div>
-                        <div className="text-sm text-muted-foreground">{t("loan.interest")}</div>
-                        <div className="font-semibold">{loan.interestRate}%</div>
+                        <div className="text-sm text-muted-foreground flex items-center gap-1">
+                          {t("loan.interest")}
+                          <div className="group relative">
+                            <Info className="h-3 w-3 cursor-help" />
+                            <div className="absolute left-0 top-6 w-64 p-3 bg-popover border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                              <div className="text-xs">
+                                <div className="font-semibold mb-1">이자율 모델</div>
+                                <div className="text-muted-foreground">
+                                  AAVE 스타일 Utilization Rate 기반으로 이자율이 변동됩니다. 대출 사용률이 높을수록
+                                  이자율이 상승합니다.
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="font-semibold">{loan.interestRate.toFixed(2)}%</div>
                       </div>
                       <div>
                         <div className="text-sm text-muted-foreground">{t("loan.accruedInterest")}</div>
                         <div className="font-semibold text-orange-500">₩{accruedInterest.toLocaleString()}</div>
                       </div>
                       <div>
-                        <div className="text-sm text-muted-foreground">{t("loan.dueDate")}</div>
-                        <div className="font-semibold">{new Date(loan.dueDate).toLocaleDateString("ko-KR")}</div>
-                      </div>
-                      <div>
                         <div className="text-sm text-muted-foreground">{t("loan.liquidationPrice")}</div>
-                        <div className="font-semibold text-red-500">
-                          ₩{portfolio?.liquidationPrice.toLocaleString()}
-                        </div>
+                        <div className="font-semibold text-red-500">₩{liquidationPrice.toLocaleString()}</div>
                       </div>
                     </div>
 
@@ -160,7 +228,7 @@ export default function LoanPage() {
           )}
         </section>
 
-        {/* Collateral Status - Left */}
+        {/* Collateral Status */}
         <section>
           <h2 className="text-2xl font-semibold mb-4">{t("loan.collateralStatus")}</h2>
 
@@ -169,25 +237,23 @@ export default function LoanPage() {
               <div className="text-sm text-muted-foreground mb-2">{t("loan.totalCollateral")}</div>
               <div className="text-3xl font-bold">₩{totalCollateral.toLocaleString()}</div>
               <div className="text-sm text-muted-foreground mt-2">
-                {t("loan.healthFactor")}: {portfolio?.healthFactor.toFixed(2) || "N/A"}
+                {t("loan.healthFactor")}: {healthFactor === Number.POSITIVE_INFINITY ? "∞" : healthFactor.toFixed(2)}
               </div>
             </Card>
 
             <Card className="p-6">
               <div className="text-sm text-muted-foreground mb-2">{t("loan.cryptoCollateral")}</div>
-              <div className="text-2xl font-bold">₩{cryptoCollateral.toLocaleString()}</div>
+              <div className="text-2xl font-bold">₩{cryptoCollateralValue.toLocaleString()}</div>
               <div className="text-sm text-muted-foreground mt-2">
-                {tokens?.length || 0}
-                {t("loan.tokens")}
+                {collateral.filter((c) => c.type === "crypto").length} {t("loan.tokens")}
               </div>
             </Card>
 
             <Card className="p-6">
               <div className="text-sm text-muted-foreground mb-2">{t("loan.stockCollateral")}</div>
-              <div className="text-2xl font-bold">₩{stockCollateral.toLocaleString()}</div>
+              <div className="text-2xl font-bold">₩{stockCollateralValue.toLocaleString()}</div>
               <div className="text-sm text-muted-foreground mt-2">
-                {stockAccounts?.length || 0}
-                {t("loan.accounts")}
+                {collateral.filter((c) => c.type === "stock").length} {t("loan.accounts")}
               </div>
             </Card>
           </div>
@@ -204,87 +270,84 @@ export default function LoanPage() {
               </Button>
             </div>
 
-            {stockAccounts?.filter((account) => loans?.some((loan) => loan.collateralAccounts?.includes(account.id)))
-              .length === 0 ? (
+            {collateral.length === 0 ? (
               <Card className="p-6 text-center text-muted-foreground">
                 <p>{t("loan.noCollateralAccounts")}</p>
               </Card>
             ) : (
-              stockAccounts
-                ?.filter((account) => loans?.some((loan) => loan.collateralAccounts?.includes(account.id)))
-                .map((account) => {
-                  const linkedLoan = loans?.find((loan) => loan.collateralAccounts?.includes(account.id))
+              <>
+                {/* Stock collateral */}
+                {collateral
+                  .filter((c) => c.type === "stock")
+                  .map((item) => {
+                    const account = stockAccounts.find((a) => a.id === item.id)
+                    if (!account) return null
 
-                  return (
-                    <Card key={account.id} className="p-4 border-accent">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold">{account.brokerage}</span>
-                            <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded">
-                              {t("loan.inUse")}
-                            </span>
-                          </div>
-                          <div className="text-sm text-muted-foreground">{account.accountNumber}</div>
-                          {linkedLoan && (
-                            <div className="text-sm text-accent mt-1">
-                              → KRW1 ₩{linkedLoan.loanAmount.toLocaleString()} {t("loan.issued")}
+                    const linkedLoan = activeLoans.find((loan) => loan.collateralAccounts?.includes(item.id))
+
+                    return (
+                      <Card key={item.id} className="p-4 border-accent">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold">{account.brokerage}</span>
+                              <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded">
+                                {t("loan.inUse")}
+                              </span>
                             </div>
-                          )}
+                            <div className="text-sm text-muted-foreground">{account.accountNumber}</div>
+                            {linkedLoan && (
+                              <div className="text-sm text-accent mt-1">
+                                → KRW1 ₩{linkedLoan.loanAmount.toLocaleString()} {t("loan.issued")}
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold">₩{item.value.toLocaleString()}</div>
+                            <div className="text-sm text-muted-foreground">{account.stocks.length}개 종목</div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold">₩{account.totalValue.toLocaleString()}</div>
-                          <div className="text-sm text-muted-foreground">{account.stocks.length}개 종목</div>
-                        </div>
-                      </div>
-                    </Card>
-                  )
-                })
-            )}
-
-            {tokens &&
-              tokens.filter(
-                (token) =>
-                  token.symbol !== "KRW1" && loans?.some((loan) => loan.collateralTokens?.includes(token.symbol)),
-              ).length > 0 && (
-                <>
-                  <h3 className="text-lg font-semibold mt-6">{t("loan.collateralCrypto")}</h3>
-                  {tokens
-                    .filter(
-                      (token) =>
-                        token.symbol !== "KRW1" && loans?.some((loan) => loan.collateralTokens?.includes(token.symbol)),
+                      </Card>
                     )
-                    .map((token) => {
-                      const linkedLoan = loans?.find((loan) => loan.collateralTokens?.includes(token.symbol))
+                  })}
 
-                      return (
-                        <Card key={token.symbol} className="p-4 border-accent">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-semibold">{token.name}</span>
-                                <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded">
-                                  {t("loan.inUse")}
-                                </span>
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {token.balance} {token.symbol}
-                              </div>
-                              {linkedLoan && (
-                                <div className="text-sm text-accent mt-1">
-                                  → KRW1 ₩{linkedLoan.loanAmount.toLocaleString()} {t("loan.usedForIssuance")}
-                                </div>
-                              )}
+                {/* Crypto collateral */}
+                {collateral
+                  .filter((c) => c.type === "crypto")
+                  .map((item) => {
+                    const token = tokens.find((t) => t.symbol === item.id)
+                    if (!token) return null
+
+                    const linkedLoan = activeLoans.find((loan) => loan.collateralTokens?.includes(item.id))
+
+                    return (
+                      <Card key={item.id} className="p-4 border-accent">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold">{token.name}</span>
+                              <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded">
+                                {t("loan.inUse")}
+                              </span>
                             </div>
-                            <div className="text-right">
-                              <div className="text-lg font-bold">₩{token.value.toLocaleString()}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {item.amount} {item.id}
                             </div>
+                            {linkedLoan && (
+                              <div className="text-sm text-accent mt-1">
+                                → KRW1 ₩{linkedLoan.loanAmount.toLocaleString()} {t("loan.usedForIssuance")}
+                              </div>
+                            )}
                           </div>
-                        </Card>
-                      )
-                    })}
-                </>
-              )}
+                          <div className="text-right">
+                            <div className="text-lg font-bold">₩{item.value.toLocaleString()}</div>
+                          </div>
+                        </div>
+                      </Card>
+                    )
+                  })}
+              </>
+            )}
           </div>
         </section>
       </main>

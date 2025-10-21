@@ -2,23 +2,20 @@
 
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import useSWR from "swr"
-import type { Token } from "@/lib/types"
 import { useState } from "react"
 import { useTranslation } from "@/lib/i18n-provider"
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+import { useAppState } from "@/store/app-state"
+import Image from "next/image"
 
 export function AssetsList() {
-  const { data: tokens } = useSWR<Token[]>("/api/tokens", fetcher)
+  const { tokens } = useAppState()
   const { t } = useTranslation()
   const [selectedNetwork, setSelectedNetwork] = useState<string>("all")
 
-  const networks = ["all", "ethereum", "solana", "polygon", "arbitrum"]
+  const networks = ["all", "ethereum", "polygon", "arbitrum"]
   const networkLabels: Record<string, string> = {
     all: "All Networks",
     ethereum: "Ethereum",
-    solana: "Solana",
     polygon: "Polygon",
     arbitrum: "Arbitrum",
   }
@@ -49,15 +46,21 @@ export function AssetsList() {
           >
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="h-10 w-10 rounded-full bg-accent/10 flex items-center justify-center text-xl">
-                  {token.icon}
+                <div className="h-10 w-10 rounded-full bg-accent/10 flex items-center justify-center overflow-hidden">
+                  {token.imageUrl ? (
+                    <Image
+                      src={token.imageUrl || "/placeholder.svg"}
+                      alt={token.name}
+                      width={40}
+                      height={40}
+                      className="rounded-full"
+                    />
+                  ) : (
+                    <span className="text-xl">{token.icon}</span>
+                  )}
                 </div>
-                {/* Network badge */}
                 <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-background border-2 border-card flex items-center justify-center text-[10px]">
-                  {token.network === "ethereum" && "Ξ"}
-                  {token.network === "solana" && "◎"}
-                  {token.network === "polygon" && "⬡"}
-                  {token.network === "arbitrum" && "▲"}
+                  {token.networkIcon}
                 </div>
               </div>
               <div>

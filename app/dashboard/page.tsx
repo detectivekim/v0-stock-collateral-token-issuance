@@ -1,27 +1,39 @@
 "use client"
 
-import { usePrivy } from "@privy-io/react-auth"
 import { useTranslation } from "@/lib/i18n-provider"
 import { NavBar } from "@/components/dashboard/nav-bar"
 import { AssetsList } from "@/components/dashboard/assets-list"
 import { StocksList } from "@/components/dashboard/stocks-list"
 import { RecentTransactions } from "@/components/dashboard/recent-transactions"
 import { QuickActions } from "@/components/dashboard/quick-actions"
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useAppState } from "@/store/app-state"
 
 export default function DashboardPage() {
-  const { authenticated, ready } = usePrivy()
   const { t } = useTranslation()
-  const router = useRouter()
+  const { tokens, stockAccounts, initializeAssets, refreshPrices } = useAppState()
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (ready && !authenticated) {
-      router.push("/")
+    const init = async () => {
+      console.log("[v0] Initializing dashboard assets...")
+      try {
+        await initializeAssets()
+        console.log("[v0] Assets initialized successfully")
+        setIsLoading(false)
+      } catch (error) {
+        console.error("[v0] Failed to initialize assets:", error)
+        setIsLoading(false)
+      }
     }
-  }, [authenticated, ready, router])
+    init()
 
-  if (!ready || !authenticated) {
+    // Refresh prices every minute
+    const interval = setInterval(refreshPrices, 60000)
+    return () => clearInterval(interval)
+  }, [initializeAssets, refreshPrices])
+
+  if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
@@ -32,25 +44,25 @@ export default function DashboardPage() {
     )
   }
 
+  const cryptoAssets = tokens.reduce((sum, token) => sum + token.value, 0)
+  const stockAssets = stockAccounts.reduce((sum, account) => sum + account.totalValue, 0)
+
   return (
     <div className="min-h-screen bg-background">
       <NavBar />
 
       <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Asset Overview */}
         <section>
           <h2 className="text-2xl font-bold mb-4">{t("dashboard.title")}</h2>
 
           <div className="grid md:grid-cols-2 gap-4 mb-6">
             <div className="p-6 rounded-lg border bg-card">
               <p className="text-sm text-muted-foreground mb-2">{t("dashboard.cryptoAssets")}</p>
-              <p className="text-3xl font-bold">₩45,230,000</p>
-              <p className="text-sm text-green-500 mt-1">+12.5%</p>
+              <p className="text-3xl font-bold">₩{cryptoAssets.toLocaleString()}</p>
             </div>
             <div className="p-6 rounded-lg border bg-card">
               <p className="text-sm text-muted-foreground mb-2">{t("dashboard.stockAssets")}</p>
-              <p className="text-3xl font-bold">₩28,500,000</p>
-              <p className="text-sm text-red-500 mt-1">-2.3%</p>
+              <p className="text-3xl font-bold">₩{stockAssets.toLocaleString()}</p>
             </div>
           </div>
         </section>

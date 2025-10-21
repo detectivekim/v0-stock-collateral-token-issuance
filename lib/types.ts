@@ -30,6 +30,7 @@ export interface Stock {
   quantity: number
   currentPrice: number
   totalValue: number
+  imageUrl?: string // Added imageUrl field for stock logos
 }
 
 export interface Loan {
@@ -51,6 +52,7 @@ export interface Token {
   balance: number
   value: number
   icon: string
+  imageUrl?: string
   network: "ethereum" | "polygon" | "arbitrum" | "optimism" | "base"
   networkIcon: string
 }

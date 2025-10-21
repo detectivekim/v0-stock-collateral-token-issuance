@@ -2,38 +2,25 @@
 
 import { Card } from "@/components/ui/card"
 import { useTranslation } from "@/lib/i18n-provider"
-import useSWR from "swr"
-import type { StockAccount } from "@/lib/types"
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+import { useAppState } from "@/store/app-state"
+import Image from "next/image"
 
 export function StocksList() {
   const { t } = useTranslation()
-  const { data: accounts, error } = useSWR<StockAccount[]>("/api/stock-accounts", fetcher)
+  const { stockAccounts } = useAppState()
 
-  if (error) {
+  if (!stockAccounts || stockAccounts.length === 0) {
     return (
       <Card className="p-6">
-        <p className="text-destructive">{t("common.error")}</p>
-      </Card>
-    )
-  }
-
-  if (!accounts) {
-    return (
-      <Card className="p-6">
-        <div className="flex items-center justify-center py-8">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        </div>
+        <p className="text-muted-foreground text-center">{t("dashboard.noStocks")}</p>
       </Card>
     )
   }
 
   return (
     <div className="space-y-4">
-      {accounts.map((account) => (
+      {stockAccounts.map((account) => (
         <Card key={account.id} className="p-6">
-          {/* Account Header */}
           <div className="flex items-center justify-between mb-4 pb-4 border-b">
             <div>
               <h3 className="font-semibold text-lg">{account.brokerage}</h3>
@@ -45,7 +32,6 @@ export function StocksList() {
             </div>
           </div>
 
-          {/* Stocks List */}
           <div className="space-y-3">
             {account.stocks.map((stock) => (
               <div
@@ -53,12 +39,21 @@ export function StocksList() {
                 className="flex items-center justify-between p-3 rounded-lg hover:bg-accent/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  {/* Stock Icon */}
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-sm font-bold text-primary">{stock.name.substring(0, 2)}</span>
+                  <div className="w-10 h-10 rounded-full bg-background border flex items-center justify-center overflow-hidden">
+                    {stock.imageUrl ? (
+                      <Image
+                        src={stock.imageUrl || "/placeholder.svg"}
+                        alt={stock.name}
+                        width={40}
+                        height={40}
+                        className="object-contain"
+                        unoptimized
+                      />
+                    ) : (
+                      <span className="text-sm font-bold text-primary">{stock.name.substring(0, 2)}</span>
+                    )}
                   </div>
 
-                  {/* Stock Info */}
                   <div>
                     <p className="font-semibold">{stock.name}</p>
                     <p className="text-sm text-muted-foreground">
@@ -67,7 +62,6 @@ export function StocksList() {
                   </div>
                 </div>
 
-                {/* Stock Value */}
                 <div className="text-right">
                   <p className="font-semibold">₩{stock.totalValue.toLocaleString()}</p>
                   <p className="text-sm text-muted-foreground">
