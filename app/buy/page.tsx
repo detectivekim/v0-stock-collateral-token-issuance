@@ -8,22 +8,39 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import useSWR from "swr"
+import { useAppState } from "@/store/app-state"
 import type { Token } from "@/lib/types"
-import { ChevronRight, TrendingUp, CheckCircle2 } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts"
+import { ChevronRight, ArrowRightLeft } from "lucide-react"
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+const COINGECKO_IDS: Record<string, string> = {
+  ETH: "ethereum",
+  BTC: "bitcoin",
+  USDT: "tether",
+}
+
+const TRADINGVIEW_SYMBOLS: Record<string, string> = {
+  ETH: "BINANCE:ETHUSDT",
+  BTC: "BINANCE:BTCUSDT",
+  USDT: "BINANCE:USDTUSD",
+}
 
 const generateChartData = (basePrice: number) => {
   const data = []
   const now = Date.now()
+  let currentPrice = basePrice
+
   for (let i = 23; i >= 0; i--) {
-    const variance = (Math.random() - 0.5) * basePrice * 0.1
+    // More realistic price movement with trend
+    const trend = Math.sin(i / 4) * basePrice * 0.02
+    const randomWalk = (Math.random() - 0.5) * basePrice * 0.015
+    currentPrice = basePrice + trend + randomWalk
+
     data.push({
-      time: new Date(now - i * 60 * 60 * 1000).toLocaleTimeString("en-US", { hour: "2-digit" }),
-      price: basePrice + variance,
+      time: new Date(now - i * 60 * 60 * 1000).toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      price: Math.max(currentPrice, basePrice * 0.9), // Prevent negative prices
     })
   }
   return data
@@ -33,10 +50,11 @@ export default function TradePage() {
   const { authenticated, ready } = usePrivy()
   const { t } = useTranslation()
   const router = useRouter()
-  const { data: tokens } = useSWR<Token[]>("/api/tokens", fetcher)
+  const { tokens, buyToken } = useAppState()
 
   const [selectedToken, setSelectedToken] = useState<Token | null>(null)
-  const [amount, setAmount] = useState("")
+  const [tokenAmount, setTokenAmount] = useState("")
+  const [krwAmount, setKrwAmount] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [tradeSuccess, setTradeSuccess] = useState<"buy" | "sell" | null>(null)
   const [showTokenSelector, setShowTokenSelector] = useState(false)
@@ -55,53 +73,83 @@ export default function TradePage() {
     }
   }, [tokens])
 
-  if (!ready || !authenticated) {
-    return null
-  }
+  useEffect(() => {
+    console.log("[v0] Selected token:", selectedToken?.symbol)
+  }, [selectedToken])
 
-  const handleAmountChange = (value: string) => {
+  const handleTokenAmountChange = (value: string) => {
     const cleaned = value.replace(/[^\d.]/g, "")
-    setAmount(cleaned)
+    setTokenAmount(cleaned)
+
+    if (cleaned && selectedToken) {
+      const krw = (Number.parseFloat(cleaned) * selectedToken.value).toFixed(0)
+      setKrwAmount(krw)
+    } else {
+      setKrwAmount("")
+    }
   }
 
-  const estimatedBuyQuantity =
-    selectedToken && amount && paymentToken ? (Number.parseFloat(amount) / selectedToken.value).toFixed(6) : "0"
+  const handleKrwAmountChange = (value: string) => {
+    const cleaned = value.replace(/[^\d.]/g, "")
+    setKrwAmount(cleaned)
 
-  const estimatedSellAmount =
-    selectedToken && amount ? (Number.parseFloat(amount) * selectedToken.value).toFixed(0) : "0"
+    if (cleaned && selectedToken) {
+      const token = (Number.parseFloat(cleaned) / selectedToken.value).toFixed(6)
+      setTokenAmount(token)
+    } else {
+      setTokenAmount("")
+    }
+  }
 
-  const hasInsufficientBalanceForBuy = paymentToken && amount && Number.parseFloat(amount) > paymentToken.balance
+  const handleSwapAmounts = () => {
+    const tempToken = tokenAmount
+    const tempKrw = krwAmount
+    setTokenAmount(tempKrw)
+    setKrwAmount(tempToken)
+  }
 
-  const hasInsufficientBalanceForSell = selectedToken && amount && Number.parseFloat(amount) > selectedToken.balance
+  const hasInsufficientBalanceForBuy = paymentToken && krwAmount && Number.parseFloat(krwAmount) > paymentToken.balance
 
-  const canBuy = selectedToken && amount && Number.parseFloat(amount) > 0 && !hasInsufficientBalanceForBuy
-  const canSell = selectedToken && amount && Number.parseFloat(amount) > 0 && !hasInsufficientBalanceForSell
+  const hasInsufficientBalanceForSell =
+    selectedToken && tokenAmount && Number.parseFloat(tokenAmount) > selectedToken.balance
+
+  const canBuy = selectedToken && krwAmount && Number.parseFloat(krwAmount) > 0 && !hasInsufficientBalanceForBuy
+  const canSell = selectedToken && tokenAmount && Number.parseFloat(tokenAmount) > 0 && !hasInsufficientBalanceForSell
 
   const handleTrade = async (type: "buy" | "sell") => {
     if ((type === "buy" && !canBuy) || (type === "sell" && !canSell)) return
 
     setIsProcessing(true)
 
-    await fetch("/api/swap", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fromToken: type === "buy" ? "KRW1" : selectedToken?.symbol,
-        toToken: type === "buy" ? selectedToken?.symbol : "KRW1",
-        amount: Number.parseFloat(amount),
-      }),
-    })
+    try {
+      if (type === "buy") {
+        buyToken("KRW1", selectedToken?.symbol || "", Number.parseFloat(krwAmount))
+      } else {
+        buyToken(selectedToken?.symbol || "", "KRW1", Number.parseFloat(tokenAmount))
+      }
 
-    setTradeSuccess(type)
-    setTimeout(() => {
-      setTradeSuccess(null)
-      setAmount("")
-    }, 2000)
+      setTradeSuccess(type)
+      setTimeout(() => {
+        setTradeSuccess(null)
+        setTokenAmount("")
+        setKrwAmount("")
+      }, 2000)
+    } catch (error) {
+      console.error("[v0] Trade failed:", error)
+    }
 
     setIsProcessing(false)
   }
 
-  const chartData = selectedToken ? generateChartData(selectedToken.value) : []
+  if (!ready || !authenticated) {
+    return null
+  }
+
+  const coinGeckoId = selectedToken ? COINGECKO_IDS[selectedToken.symbol] || "ethereum" : "ethereum"
+
+  const tradingViewSymbol = selectedToken
+    ? TRADINGVIEW_SYMBOLS[selectedToken.symbol] || "BINANCE:ETHUSDT"
+    : "BINANCE:ETHUSDT"
 
   return (
     <div className="min-h-screen bg-background">
@@ -118,9 +166,17 @@ export default function TradePage() {
                 <div className="flex items-center gap-3">
                   {selectedToken ? (
                     <>
-                      <div className="h-12 w-12 rounded-full bg-accent/10 flex items-center justify-center">
-                        <span className="text-xl font-bold">{selectedToken.symbol[0]}</span>
-                      </div>
+                      {selectedToken.imageUrl ? (
+                        <img
+                          src={selectedToken.imageUrl || "/placeholder.svg"}
+                          alt={selectedToken.symbol}
+                          className="h-12 w-12 rounded-full"
+                        />
+                      ) : (
+                        <div className="h-12 w-12 rounded-full bg-accent/10 flex items-center justify-center">
+                          <span className="text-xl font-bold">{selectedToken.symbol[0]}</span>
+                        </div>
+                      )}
                       <div>
                         <div className="font-semibold text-lg">{selectedToken.name}</div>
                         <div className="text-sm text-muted-foreground">{selectedToken.symbol}</div>
@@ -133,10 +189,6 @@ export default function TradePage() {
                 <div className="flex items-center gap-3">
                   <div className="text-right">
                     <div className="text-2xl font-bold">₩{selectedToken?.value.toLocaleString()}</div>
-                    <div className="text-sm text-accent flex items-center gap-1 justify-end">
-                      <TrendingUp className="h-3 w-3" />
-                      +2.5%
-                    </div>
                   </div>
                   <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </div>
@@ -155,13 +207,23 @@ export default function TradePage() {
                       onClick={() => {
                         setSelectedToken(token)
                         setShowTokenSelector(false)
+                        setTokenAmount("")
+                        setKrwAmount("")
                       }}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-accent/10 flex items-center justify-center">
-                            <span className="text-lg font-bold">{token.symbol[0]}</span>
-                          </div>
+                          {token.imageUrl ? (
+                            <img
+                              src={token.imageUrl || "/placeholder.svg"}
+                              alt={token.symbol}
+                              className="h-10 w-10 rounded-full"
+                            />
+                          ) : (
+                            <div className="h-10 w-10 rounded-full bg-accent/10 flex items-center justify-center">
+                              <span className="text-lg font-bold">{token.symbol[0]}</span>
+                            </div>
+                          )}
                           <div>
                             <div className="font-semibold">{token.name}</div>
                             <div className="text-sm text-muted-foreground">{token.symbol}</div>
@@ -169,10 +231,6 @@ export default function TradePage() {
                         </div>
                         <div className="text-right">
                           <div className="font-medium">₩{token.value.toLocaleString()}</div>
-                          <div className="text-sm text-accent flex items-center gap-1">
-                            <TrendingUp className="h-3 w-3" />
-                            +2.5%
-                          </div>
                         </div>
                       </div>
                     </div>
@@ -182,89 +240,79 @@ export default function TradePage() {
           )}
 
           <Card className="p-6 mb-4">
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={chartData}>
-                <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} domain={["auto", "auto"]} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                  formatter={(value: number) => [`₩${value.toLocaleString()}`, "Price"]}
-                />
-                <Line type="monotone" dataKey="price" stroke="hsl(var(--accent))" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+            <div className="mb-4">
+              <div className="text-sm text-muted-foreground mb-1">{selectedToken?.symbol} Price Chart</div>
+              <div className="text-2xl font-bold">₩{selectedToken?.value.toLocaleString()}</div>
+            </div>
+            <div className="w-full rounded-lg overflow-hidden bg-background" style={{ height: "400px" }}>
+              <iframe
+                src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview&symbol=${tradingViewSymbol}&interval=D&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=Asia%2FSeoul&withdateranges=1&studies_overrides={}&overrides={}&enabled_features=[]&disabled_features=[]&locale=en&utm_source=localhost&utm_medium=widget_new&utm_campaign=chart&utm_term=${tradingViewSymbol}`}
+                width="100%"
+                height="100%"
+                frameBorder="0"
+                allowTransparency={true}
+                scrolling="no"
+                allowFullScreen={true}
+                className="w-full h-full"
+                title={`${selectedToken?.symbol} Price Chart`}
+              />
+            </div>
           </Card>
 
           <Card className="p-6 mb-4">
             <div className="space-y-4">
               <div>
-                <label className="text-sm text-muted-foreground mb-2 block">{t("trade.amount")}</label>
-                <div className="relative">
-                  <Input
-                    type="text"
-                    value={amount}
-                    onChange={(e) => handleAmountChange(e.target.value)}
-                    placeholder={t("trade.enterAmount")}
-                    className="text-4xl font-bold h-auto py-4 border-0 focus-visible:ring-0 bg-transparent"
-                  />
-                </div>
+                <label className="text-sm text-muted-foreground mb-2 block">
+                  {selectedToken?.symbol} {t("trade.amount")}
+                </label>
+                <Input
+                  type="text"
+                  value={tokenAmount}
+                  onChange={(e) => handleTokenAmountChange(e.target.value)}
+                  placeholder={`0.00 ${selectedToken?.symbol || ""}`}
+                  className="text-2xl font-bold h-auto py-3"
+                />
               </div>
 
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleSwapAmounts}
+                  className="rounded-full hover:bg-muted"
+                  type="button"
+                >
+                  <ArrowRightLeft className="h-5 w-5 text-muted-foreground" />
+                </Button>
+              </div>
+
+              <div>
+                <label className="text-sm text-muted-foreground mb-2 block">KRW1 {t("trade.amount")}</label>
+                <Input
+                  type="text"
+                  value={krwAmount}
+                  onChange={(e) => handleKrwAmountChange(e.target.value)}
+                  placeholder="₩0"
+                  className="text-2xl font-bold h-auto py-3"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-sm pt-2 border-t">
+                <div className="flex flex-col gap-1 w-full">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">{t("trade.krw1Balance")}:</span>
-                    <span className="ml-2 font-medium">₩{paymentToken?.balance.toLocaleString() || "0"}</span>
+                    <span className="font-medium">₩{paymentToken?.balance.toLocaleString() || "0"}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">
                       {selectedToken?.symbol} {t("trade.balance")}:
                     </span>
-                    <span className="ml-2 font-medium">{selectedToken?.balance.toFixed(6) || "0"}</span>
+                    <span className="font-medium">{selectedToken?.balance.toFixed(6) || "0"}</span>
                   </div>
                 </div>
               </div>
-
-              {selectedToken && amount && (
-                <div className="pt-4 border-t space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{t("trade.buyYouGet")}</span>
-                    <span className="font-semibold text-accent">
-                      {estimatedBuyQuantity} {selectedToken.symbol}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{t("trade.sellYouGet")}</span>
-                    <span className="font-semibold text-destructive">
-                      ₩{Number(estimatedSellAmount).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              )}
             </div>
           </Card>
-
-          {(hasInsufficientBalanceForBuy || hasInsufficientBalanceForSell) && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>
-                {hasInsufficientBalanceForBuy && t("trade.insufficientKRW1")}
-                {hasInsufficientBalanceForSell && t("trade.insufficientToken")}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {tradeSuccess && (
-            <Alert className="mb-4 border-accent">
-              <CheckCircle2 className="h-4 w-4 text-accent" />
-              <AlertDescription>
-                {tradeSuccess === "buy" ? t("trade.buySuccess") : t("trade.sellSuccess")}
-              </AlertDescription>
-            </Alert>
-          )}
 
           <div className="grid grid-cols-2 gap-4">
             <Button

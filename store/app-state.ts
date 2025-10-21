@@ -27,6 +27,9 @@ interface AppState {
   cryptoPrices: Record<string, number>
   stockPrices: Record<string, number>
 
+  // KYC verification state
+  isKYCVerified: boolean
+
   // Actions
   initializeAssets: () => Promise<void>
   refreshPrices: () => Promise<void>
@@ -42,6 +45,9 @@ interface AppState {
 
   // Trade actions
   buyToken: (fromSymbol: string, toSymbol: string, amount: number) => void
+
+  // KYC verification action
+  verifyKYC: () => void
 
   // Calculations
   getTotalCollateralValue: () => number
@@ -60,6 +66,7 @@ export const useAppState = create<AppState>()((set, get) => ({
   transactions: [],
   cryptoPrices: {},
   stockPrices: {},
+  isKYCVerified: false,
 
   initializeAssets: async () => {
     const btcData = await getCoinData("BTC")
@@ -71,8 +78,8 @@ export const useAppState = create<AppState>()((set, get) => ({
         {
           symbol: "BTC",
           name: "Bitcoin",
-          balance: 0.7,
-          value: 0.7 * btcData.price,
+          balance: 0.1, // Changed from 0.7 to 0.1
+          value: 0.1 * btcData.price,
           icon: "₿",
           imageUrl: btcData.imageUrl,
           network: "ethereum",
@@ -81,8 +88,8 @@ export const useAppState = create<AppState>()((set, get) => ({
         {
           symbol: "ETH",
           name: "Ethereum",
-          balance: 12,
-          value: 12 * ethData.price,
+          balance: 4, // Changed from 12 to 4
+          value: 4 * ethData.price,
           icon: "Ξ",
           imageUrl: ethData.imageUrl,
           network: "ethereum",
@@ -506,5 +513,9 @@ export const useAppState = create<AppState>()((set, get) => ({
     const currentBorrowed = get().getTotalBorrowedValue()
     const maxLTV = 0.7
     return collateralValue * maxLTV - currentBorrowed
+  },
+
+  verifyKYC: () => {
+    set({ isKYCVerified: true })
   },
 }))

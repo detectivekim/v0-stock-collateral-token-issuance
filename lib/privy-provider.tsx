@@ -3,31 +3,57 @@
 import type React from "react"
 import { PrivyProvider } from "@privy-io/react-auth"
 import { useEffect } from "react"
-import { mainnet, base } from "viem/chains"
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    console.log("[v0] Privy App ID:", "cmgq7boke000rjs0cun5ww5t6")
-    console.log("[v0] Privy config:", {
-      loginMethods: ["email", "wallet"],
-      supportedChains: ["mainnet", "base"],
-    })
-
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      // Log Privy errors for debugging
+      const msg = event.reason?.message?.toLowerCase() || ""
+      const errorName = event.reason?.name?.toLowerCase() || ""
       if (
-        event.reason?.message?.includes("auth.privy.io") ||
-        event.reason?.message?.includes("TimeoutError") ||
+        msg.includes("auth.privy.io") ||
+        msg.includes("timeout") ||
+        msg.includes("cross-origin") ||
+        msg.includes("ethereum") ||
+        msg.includes("getprovider") ||
+        msg.includes("blocked a frame") ||
+        msg.includes("failed to read") ||
+        msg.includes("securityerror") ||
+        msg.includes("walletconnector") ||
+        errorName === "securityerror" ||
         event.reason?.code === "api_error"
       ) {
-        console.error("[v0] Privy error:", event.reason)
         event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
       }
     }
 
-    window.addEventListener("unhandledrejection", handleUnhandledRejection)
+    const handleError = (event: ErrorEvent) => {
+      const msg = event.message?.toLowerCase() || ""
+      const errorName = event.error?.name?.toLowerCase() || ""
+      if (
+        msg.includes("cross-origin") ||
+        msg.includes("ethereum") ||
+        msg.includes("getprovider") ||
+        msg.includes("blocked a frame") ||
+        msg.includes("failed to read") ||
+        msg.includes("securityerror") ||
+        msg.includes("walletconnector") ||
+        errorName === "securityerror"
+      ) {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+        return false
+      }
+    }
+
+    window.addEventListener("unhandledrejection", handleUnhandledRejection, true)
+    window.addEventListener("error", handleError, true)
+
     return () => {
-      window.removeEventListener("unhandledrejection", handleUnhandledRejection)
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection, true)
+      window.removeEventListener("error", handleError, true)
     }
   }, [])
 
@@ -35,18 +61,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId="cmgq7boke000rjs0cun5ww5t6"
       config={{
-        loginMethods: ["email", "wallet"],
+        loginMethods: ["email"],
         appearance: {
           theme: "dark",
           accentColor: "#00D395",
         },
-        embeddedWallets: {
-          createOnLogin: "users-without-wallets",
-        },
-        supportedChains: [mainnet, base],
-      }}
-      onSuccess={(user) => {
-        console.log("[v0] Privy login success:", user)
       }}
     >
       {children}

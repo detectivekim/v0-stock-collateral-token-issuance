@@ -15,13 +15,13 @@ interface LoanConfigurationProps {
 }
 
 export function LoanConfiguration({ collateralValue, onConfirm, onBack }: LoanConfigurationProps) {
-  const maxLoan = collateralValue * 3
+  const maxLoan = collateralValue * 0.7
   const [loanAmount, setLoanAmount] = useState(maxLoan * 0.5)
   const [customAmount, setCustomAmount] = useState("")
 
   const ltv = (loanAmount / collateralValue) * 100
-  const liquidationPrice = collateralValue + loanAmount * 0.1
-  const interestRate = 5.5
+  const liquidationThreshold = collateralValue * 0.9
+  const interestRate = 5.12
 
   const handleSliderChange = (value: number[]) => {
     setLoanAmount(value[0])
@@ -36,7 +36,7 @@ export function LoanConfiguration({ collateralValue, onConfirm, onBack }: LoanCo
     }
   }
 
-  const riskLevel = ltv >= 250 ? "high" : ltv >= 200 ? "medium" : "low"
+  const riskLevel = ltv >= 65 ? "high" : ltv >= 50 ? "medium" : "low"
   const riskColor =
     riskLevel === "high" ? "text-destructive" : riskLevel === "medium" ? "text-yellow-500" : "text-accent"
   const riskLabel = riskLevel === "high" ? "위험" : riskLevel === "medium" ? "주의" : "안전"
@@ -62,7 +62,7 @@ export function LoanConfiguration({ collateralValue, onConfirm, onBack }: LoanCo
             />
             <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
               <span>최소: ₩{(maxLoan * 0.1).toLocaleString()}</span>
-              <span>최대: ₩{maxLoan.toLocaleString()}</span>
+              <span>최대: ₩{maxLoan.toLocaleString()} (70%)</span>
             </div>
           </div>
 
@@ -125,8 +125,8 @@ export function LoanConfiguration({ collateralValue, onConfirm, onBack }: LoanCo
           </div>
 
           <div className="flex items-center justify-between py-3">
-            <span className="text-muted-foreground">청산 가격</span>
-            <span className="font-semibold">₩{liquidationPrice.toLocaleString()}</span>
+            <span className="text-muted-foreground">청산 기준 (90%)</span>
+            <span className="font-semibold">₩{liquidationThreshold.toLocaleString()}</span>
           </div>
         </div>
       </Card>
@@ -137,7 +137,7 @@ export function LoanConfiguration({ collateralValue, onConfirm, onBack }: LoanCo
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             {riskLevel === "high"
-              ? "LTV 비율이 매우 높습니다. 주가 하락 시 청산 위험이 있습니다."
+              ? "LTV 비율이 매우 높습니다. 담보 가치가 90% 이하로 떨어지면 청산됩니다."
               : "LTV 비율이 높은 편입니다. 담보 비율을 주의깊게 모니터링하세요."}
           </AlertDescription>
         </Alert>
@@ -150,8 +150,8 @@ export function LoanConfiguration({ collateralValue, onConfirm, onBack }: LoanCo
           <div className="flex-1">
             <h4 className="font-semibold mb-2">청산 안내</h4>
             <p className="text-sm text-muted-foreground">
-              담보 가치가 ₩{liquidationPrice.toLocaleString()} 이하로 떨어지면 자동으로 청산됩니다. 청산을 방지하려면
-              담보를 추가하거나 대출을 상환하세요.
+              담보 가치가 대출 금액의 90% 이하로 떨어지면 자동으로 청산됩니다. 암호화폐 담보가 먼저 청산되며, 암호화폐
+              담보가 없는 경우 주식 시장 개장 전에 담보를 추가하거나 대출을 상환해야 합니다.
             </p>
           </div>
         </div>

@@ -30,7 +30,7 @@
     "tailwindcss-animate": "^1.0.7",
     "tw-animate-css": "latest",
     "use-sync-external-store": "latest",
-    "viem": "latest",
+    "viem": "2.38.3",
     "zustand": "latest"
   },
   "devDependencies": {

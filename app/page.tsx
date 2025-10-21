@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { ArrowRight, Languages } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
+import Link from "next/link"
+import { SeesawBrand } from "@/components/ui/logo"
 
 export default function LandingPage() {
   const { login, authenticated, ready } = usePrivy()
@@ -53,12 +55,9 @@ export default function LandingPage() {
       <div className="container mx-auto px-4 py-16">
         {/* Header */}
         <header className="flex items-center justify-between mb-32">
-          <div className="flex items-center gap-2">
-            <div className="h-10 w-10 rounded-full bg-accent flex items-center justify-center">
-              <span className="text-accent-foreground font-bold text-xl">S</span>
-            </div>
-            <span className="text-2xl font-bold">{t("brand.name")}</span>
-          </div>
+          <Link href="/">
+            <SeesawBrand />
+          </Link>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={toggleLanguage} className="gap-2">
               <Languages className="h-4 w-4" />

@@ -11,16 +11,18 @@ import { Card } from "@/components/ui/card"
 import { CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { useAppState } from "@/store/app-state"
 
 type Step = "consent" | "selection" | "configuration" | "success"
 
 export default function BorrowPage() {
   const { authenticated } = usePrivy()
   const router = useRouter()
+  const stockAccounts = useAppState((state) => state.stockAccounts)
+  const createLoan = useAppState((state) => state.createLoan)
+  const addStockCollateral = useAppState((state) => state.addStockCollateral)
   const [step, setStep] = useState<Step>("consent")
-  const [selectedCollateral, setSelectedCollateral] = useState<
-    { accountId: string; stockSymbol: string; value: number }[]
-  >([])
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([])
   const [loanAmount, setLoanAmount] = useState(0)
 
   useEffect(() => {
@@ -33,32 +35,41 @@ export default function BorrowPage() {
     return null
   }
 
-  const collateralValue = selectedCollateral.reduce((sum, item) => sum + item.value, 0)
+  const collateralValue = selectedAccountIds.reduce((sum, accountId) => {
+    const account = stockAccounts.find((acc) => acc.id === accountId)
+    return sum + (account?.totalValue || 0)
+  }, 0)
 
   const handleConsentComplete = () => {
     setStep("selection")
   }
 
-  const handleCollateralSelected = (selected: { accountId: string; stockSymbol: string; value: number }[]) => {
-    setSelectedCollateral(selected)
+  const handleCollateralSelected = (accountIds: string[]) => {
+    console.log("[v0] Collateral selected:", accountIds)
+    setSelectedAccountIds(accountIds)
     setStep("configuration")
   }
 
   const handleLoanConfirm = async (amount: number) => {
+    console.log("[v0] Executing loan:", { amount, selectedAccountIds, collateralValue })
+
     setLoanAmount(amount)
 
-    const response = await fetch("/api/borrow", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        collateralValue,
-        amount,
-        collateral: selectedCollateral,
-      }),
-    })
+    try {
+      // Add selected stock accounts as collateral
+      selectedAccountIds.forEach((accountId) => {
+        console.log("[v0] Adding collateral:", accountId)
+        addStockCollateral(accountId)
+      })
 
-    if (response.ok) {
+      // Create the loan
+      console.log("[v0] Creating loan with amount:", amount)
+      createLoan(amount)
+
+      console.log("[v0] Loan created successfully")
       setStep("success")
+    } catch (error) {
+      console.error("[v0] Failed to create loan:", error)
     }
   }
 

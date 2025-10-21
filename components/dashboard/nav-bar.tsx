@@ -8,6 +8,7 @@ import { LayoutDashboard, Wallet, Send, Download, ShoppingCart, LogOut, Language
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { SeesawBrand } from "@/components/ui/logo"
 
 const navItems = [
   { href: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
@@ -56,11 +57,8 @@ export function NavBar() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center">
-              <span className="text-accent-foreground font-bold">S</span>
-            </div>
-            <span className="text-xl font-bold">{t("brand.name")}</span>
+          <Link href="/dashboard">
+            <SeesawBrand className="scale-90" />
           </Link>
 
           {/* Navigation */}
